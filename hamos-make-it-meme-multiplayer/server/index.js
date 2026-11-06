@@ -5,7 +5,10 @@ import crypto from 'node:crypto';
 import {MAX_TEXT,sanitize,scoreVotes,validVote} from './rules.js';
 import {templateWithLayout} from './layouts.js';
 
-const app=express();app.use((req,res,next)=>{const origin=req.headers.origin;const allowed=(process.env.ALLOWED_ORIGINS??'http://localhost:5173,http://localhost:8787').split(',').map(x=>x.trim());if(origin&&allowed.includes(origin)){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin')}if(req.method==='OPTIONS'){res.status(204).end();return}next()});const server=createServer(app);const wss=new WebSocketServer({server,path:'/ws',maxPayload:8192});
+// Keep the deployed game origin available alongside additional configured origins.
+const allowedOrigins = ['https://hamosmakeitmeme.netlify.app', ...(process.env.ALLOWED_ORIGINS ?? 'http://localhost:5173,http://localhost:8787').split(',')].map(origin => origin.trim().replace(/\/$/, '')).filter(Boolean);
+
+const app=express();app.use((req,res,next)=>{const origin=req.headers.origin;const allowed=allowedOrigins;if(origin&&allowed.includes(origin)){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin')}if(req.method==='OPTIONS'){res.status(204).end();return}next()});const server=createServer(app);const wss=new WebSocketServer({server,path:'/ws',maxPayload:8192});
 const rooms=new Map(),clients=new Map();let online=0;
 // Meme images load from a third-party source, not distributed with this project.
 // Review the provider's terms and individual template rights before public deployment.
@@ -56,7 +59,7 @@ function leaveRoom(ws,r,c){const p=r.players.get(c.id);if(p)r.players.delete(c.i
  if(r.phase==='caption'&&[...r.players.values()].filter(p=>p.connected).every(p=>r.submissions.has(p.id)))beginVoting(r);else broadcastRoom(r)}broadcastLobby()}
 function join(ws,r,name){if(!r||r.players.size>=r.capacity||r.phase!=='lobby'){err(ws,'Room unavailable, full or already in a match.');return}if(clients.get(ws)?.room){err(ws,'You are already in a room.');return}const id=clients.get(ws).id;const p={id,name:sanitize(name,20)||'Guest',emoji:choices[crypto.randomInt(choices.length)],score:0,ready:false,connected:true,ws};r.players.set(id,p);clients.get(ws).room=r.code;sessions.set(clients.get(ws).token,{id,room:r.code});if(!r.host)r.host=id;broadcastRoom(r);broadcastLobby()}
 const rate=new WeakMap();
-wss.on('connection',(ws,req)=>{const origin=req.headers.origin??'';const allowed=(process.env.ALLOWED_ORIGINS??'http://localhost:5173,http://localhost:8787').split(',').map(s=>s.trim());if(origin&&!allowed.includes(origin)){ws.close(1008,'Origin not allowed');return}const id=crypto.randomUUID();const token=crypto.randomBytes(24).toString('hex');clients.set(ws,{id,token,room:null});sessions.set(token,{id,room:null});online++;send(ws,'welcome',{id,token,online,rooms:publicRooms()});broadcastLobby();ws.on('message',data=>{try{const last=rate.get(ws)??0;if(Date.now()-last<90)return;rate.set(ws,Date.now());const m=JSON.parse(data.toString());const c=clients.get(ws),r=rooms.get(c.room);if(!c||!m||typeof m.type!=='string')return;
+wss.on('connection',(ws,req)=>{const origin=req.headers.origin??'';const allowed=allowedOrigins;if(origin&&!allowed.includes(origin)){ws.close(1008,'Origin not allowed');return}const id=crypto.randomUUID();const token=crypto.randomBytes(24).toString('hex');clients.set(ws,{id,token,room:null});sessions.set(token,{id,room:null});online++;send(ws,'welcome',{id,token,online,rooms:publicRooms()});broadcastLobby();ws.on('message',data=>{try{const last=rate.get(ws)??0;if(Date.now()-last<90)return;rate.set(ws,Date.now());const m=JSON.parse(data.toString());const c=clients.get(ws),r=rooms.get(c.room);if(!c||!m||typeof m.type!=='string')return;
  switch(m.type){
  case 'resume':{const record=sessions.get(sanitize(m.token,64));const prev=record&&rooms.get(record.room);const player=prev?.players.get(record.id);if(!prev||!player)return err(ws,'Previous room is no longer available.');
  const other=clients.get(ws);if(other.room)return;const oldWs=player.ws;if(oldWs&&oldWs!==ws&&oldWs.readyState===WebSocket.OPEN)oldWs.close(4000,'Session resumed elsewhere');
