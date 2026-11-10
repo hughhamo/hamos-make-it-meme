@@ -17,5 +17,7 @@ test('user captions are bounded and stripped of markup delimiters',()=>{
  assert.equal(sanitize('<h1>Hi</h1>'),'h1Hi/h1');
  assert.equal(sanitize('a'.repeat(200),110).length,110);
 });
-
-test('hidden skip words match only as standalone words, case-insensitively',()=>{\n for(const word of ['Hamo','hamo','HAMO','Hugh','HUGH','Hami','Hamu','(Hamo!)','say Hugh, please'])assert.equal(hasHiddenSkipWord(word),true,word);\n for(const text of ['hamometer','Hughie','I like ham','shamoo','hamo123','123hamo','Hamiya'])assert.equal(hasHiddenSkipWord(text),false,text);\n});\n
+test('hidden skip words match only as standalone words, case-insensitively',()=>{
+ for(const word of ['Hamo','hamo','HAMO','Hugh','HUGH','Hami','Hamu','(Hamo!)','say Hugh, please'])assert.equal(hasHiddenSkipWord(word),true,word);
+ for(const text of ['hamometer','Hughie','I like ham','shamoo','hamo123','123hamo','Hamiya'])assert.equal(hasHiddenSkipWord(text),false,text);
+});
