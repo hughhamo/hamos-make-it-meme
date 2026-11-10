@@ -2,7 +2,7 @@ import express from 'express';
 import {createServer} from 'node:http';
 import {WebSocketServer,WebSocket} from 'ws';
 import crypto from 'node:crypto';
-import {MAX_TEXT,sanitize,scoreVotes,validVote} from './rules.js';
+import {MAX_TEXT,sanitize,scoreVotes,validVote,hasHiddenSkipWord} from './rules.js';
 import {templateWithLayout} from './layouts.js';
 
 // Keep the deployed game origin available alongside additional configured origins.
@@ -82,7 +82,7 @@ wss.on('connection',(ws,req)=>{const origin=req.headers.origin??'';const allowed
  r.memeChanges.set(c.id,used+1);r.playerTemplates.set(c.id,next);
  send(ws,'state',{room:roomState(r,c.id)});break
  }
- case 'submit':{if(!r||r.phase!=='caption'||r.submissions.has(c.id)||Date.now()>r.deadline)return;const template=r.playerTemplates.get(c.id)??r.template;const input=Array.isArray(m.captions)?m.captions:[m.top,m.bottom];const captions=Array.from({length:template.captionCount??2},(_,i)=>sanitize(input[i],MAX_TEXT));if(!captions.some(Boolean))return err(ws,'Write a caption before submitting.');r.submissions.set(c.id,{id:c.id,captions,template});if([...r.players.values()].filter(p=>p.connected).every(p=>r.submissions.has(p.id)))beginVoting(r);else broadcastRoom(r);break}
+ case 'submit':{if(!r||r.phase!=='caption'||r.submissions.has(c.id)||Date.now()>r.deadline)return;const template=r.playerTemplates.get(c.id)??r.template;const input=Array.isArray(m.captions)?m.captions:[m.top,m.bottom];if(hasHiddenSkipWord(input.join(' '))){const alternatives=memeLibrary.filter(t=>t.url!==template.url);if(alternatives.length){r.playerTemplates.set(c.id,alternatives[crypto.randomInt(alternatives.length)]);send(ws,'state',{room:roomState(r,c.id)});}break;}const captions=Array.from({length:template.captionCount??2},(_,i)=>sanitize(input[i],MAX_TEXT));if(!captions.some(Boolean))return err(ws,'Write a caption before submitting.');r.submissions.set(c.id,{id:c.id,captions,template});if([...r.players.values()].filter(p=>p.connected).every(p=>r.submissions.has(p.id)))beginVoting(r);else broadcastRoom(r);break}
  case 'vote':{if(!r||r.phase!=='vote'||Date.now()>r.deadline)return;const target=r.voteOrder[r.voteIndex];if(!target||target===c.id)return;const votes=r.votes.get(target);const stars=Number(m.stars);if(!votes||votes.has(c.id)||!validVote(stars))return;votes.set(c.id,stars);send(ws,'voteAccepted',{});const eligible=[...r.players.values()].filter(p=>p.id!==target&&p.connected).map(p=>p.id);if(eligible.every(id=>votes.has(id))){clearClock(r);r.voteIndex++;nextVote(r)}break}
  case 'again':{if(!r||r.phase!=='finished'||r.host!==c.id)return;r.phase='lobby';r.round=0;r.champion=null;r.deadline=null;r.usedTemplates=[];r.hallOfFame=[];r.players.forEach(p=>{p.score=0;p.ready=false});broadcastRoom(r);broadcastLobby();break}
  default:break
