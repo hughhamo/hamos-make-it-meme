@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {sanitize,scoreVotes,validVote} from '../server/rules.js';
+import {sanitize,scoreVotes,validVote,hasHiddenSkipWord} from '../server/rules.js';
 test('averages normalized across different numbers of votes',()=>{
  assert.deepEqual(scoreVotes([5]),{rating:5,points:500,votes:1});
  assert.deepEqual(scoreVotes([5,5,5]),{rating:5,points:500,votes:3});
@@ -17,3 +17,5 @@ test('user captions are bounded and stripped of markup delimiters',()=>{
  assert.equal(sanitize('<h1>Hi</h1>'),'h1Hi/h1');
  assert.equal(sanitize('a'.repeat(200),110).length,110);
 });
+
+test('hidden skip words match only as standalone words, case-insensitively',()=>{\n for(const word of ['Hamo','hamo','HAMO','Hugh','HUGH','Hami','Hamu','(Hamo!)','say Hugh, please'])assert.equal(hasHiddenSkipWord(word),true,word);\n for(const text of ['hamometer','Hughie','I like ham','shamoo','hamo123','123hamo','Hamiya'])assert.equal(hasHiddenSkipWord(text),false,text);\n});\n
