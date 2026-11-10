@@ -13,7 +13,7 @@ const rooms=new Map(),clients=new Map();let online=0;
 let maintenanceUntil=0,maintenanceTimer=null;
 function maintenanceActive(){return maintenanceUntil>Date.now()}
 function broadcastMaintenance(){const active=maintenanceActive();const remainingMs=active?maintenanceUntil-Date.now():0;for(const ws of clients.keys())send(ws,'maintenance',{active,remainingMs})}
-function startMaintenance(){maintenanceUntil=Date.now()+600000;for(const r of rooms.values())clearClock(r);rooms.clear();sessions.clear();if(maintenanceTimer)clearTimeout(maintenanceTimer);broadcastMaintenance();maintenanceTimer=setTimeout(()=>{maintenanceUntil=0;maintenanceTimer=null;broadcastMaintenance();broadcastLobby()},600000)}
+function startMaintenance(){maintenanceUntil=Date.now()+600000;for(const r of rooms.values())clearClock(r);rooms.clear();for(const c of clients.values())c.room=null;sessions.clear();if(maintenanceTimer)clearTimeout(maintenanceTimer);broadcastMaintenance();maintenanceTimer=setTimeout(()=>{maintenanceUntil=0;maintenanceTimer=null;broadcastMaintenance();broadcastLobby()},600000)}
 // Meme images load from a third-party source, not distributed with this project.
 // Review the provider's terms and individual template rights before public deployment.
 const FALLBACK_MEMES=[
